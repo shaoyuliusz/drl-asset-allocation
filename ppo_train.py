@@ -20,12 +20,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp-name", type=str, default=os.path.basename(__file__).rstrip(".py"),
         help="the name of this experiment")
-    parser.add_argument("--learning-rate", type=float, default=2.5e-4,
-        help="the learning rate of the optimizer")
     parser.add_argument("--seed", type=int, default=1,
         help="seed of the experiment")
-    parser.add_argument("--total-timesteps", type=int, default=50000,
-        help="total timesteps of the experiments")
     parser.add_argument("--torch-deterministic", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="if toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument("--cuda", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
@@ -43,6 +39,10 @@ def parse_args():
                         help="model save path")
 
     # Algorithm specific arguments
+    parser.add_argument("--learning-rate", type=float, default=2.5e-4,
+        help="the learning rate of the optimizer")
+    parser.add_argument("--total-timesteps", type=int, default=50000,
+        help="total timesteps of the experiments")
     parser.add_argument("--num-envs", type=int, default=1,
         help="the number of parallel game environments")
     parser.add_argument("--num-steps", type=int, default=128,
@@ -51,7 +51,7 @@ def parse_args():
         help="Toggle learning rate annealing for policy and value networks")
     parser.add_argument("--gae", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="Use GAE for advantage computation")
-    parser.add_argument("--gamma", type=float, default=0.99,
+    parser.add_argument("--gamma", type=float, default=1.0,
         help="the discount factor gamma")
     parser.add_argument("--gae-lambda", type=float, default=0.95,
         help="the lambda for the general advantage estimation")
@@ -108,8 +108,9 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    df = pd.read_csv("data/yahoo_finance_train.csv")
-    stock_env_trade = StockEnvTrade(df = df)
+    #df = pd.read_csv("data/yahoo_finance_train.csv")
+    df = pd.DataFrame({'AAPL':[50, 100], "JPM": [100, 50]})
+    stock_env_trade = StockEnvTrade(df = df.head(2))
     
     
     # env setup
@@ -137,7 +138,7 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
     obs_, _ = envs.reset()
-
+    
     next_obs = torch.Tensor(obs_).to(device) #(1, 17) shaped tensor
     next_done = torch.zeros(args.num_envs).to(device) #next_done[i] corresponds to the ith sub-environment being not done and done.
     num_updates = args.total_timesteps // args.batch_size
@@ -150,7 +151,6 @@ if __name__ == "__main__":
             optimizer.param_groups[0]["lr"] = lrnow
         # ROLLOUT PHASE
         for step in range(0, args.num_steps):
-            #print(step)
             global_step += 1 * args.num_envs
             obs[step] = next_obs
             dones[step] = next_done
@@ -171,14 +171,20 @@ if __name__ == "__main__":
             
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(done).to(device)
+
             for item in info:
                 if item == "final_info":
                     for obj in info[item]:
                         if "episode" in obj:
-                            print(f"global_step={global_step}, episodic_return={obj['episode']['r']}")
-                            writer.add_scalar("charts/episodic_return", obj["episode"]["r"], global_step)
+                            print(f"global_step={global_step}, episodic_return={obj['episodic_return']}") #cumulative rewards in an episode
+                            writer.add_scalar("charts/episodic_return", obj["episodic_return"], global_step)
                             writer.add_scalar("charts/episodic_length", obj["episode"]["l"], global_step)
                             break
+                        # if "episode" in obj:
+                        #     print(f"global_step={global_step}, episodic_return={obj['episode']['r']}") #cumulative rewards in an episode
+                        #     writer.add_scalar("charts/episodic_return", obj["episode"]["r"], global_step)
+                        #     writer.add_scalar("charts/episodic_length", obj["episode"]["l"], global_step)
+                        #     break
         
         # bootstrap value if not done
         with torch.no_grad():
@@ -213,15 +219,10 @@ if __name__ == "__main__":
         #print("envs.single_observation_space.shape", (8,)
         #print("b_obs shape: ", b_obs.shape) #(512,8)
         b_logprobs = logprobs.reshape(-1)
-        #print(b_logprobs.shape) 512
         b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
-        #print(b_actions.shape) 512
         b_advantages = advantages.reshape(-1)
-        #print(b_advantages.shape) 512
         b_returns = returns.reshape(-1)
-        # print(b_returns.shape) 512
         b_values = values.reshape(-1)
-        # print(b_values.shape) 512
 
         #LEARNING PHASE
         # Optimizing the policy and value network
