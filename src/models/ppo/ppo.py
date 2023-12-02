@@ -283,12 +283,12 @@ def make_env(env_: gym.Env, seed:int, use_normalization: bool=True) -> Callable[
             env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, 0, 10)) #observation clipping
             env = gym.wrappers.NormalizeReward(env) #reward scaling
             env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10)) #reward clipping
-            env.seed(seed)
+            env.set_seed(seed)
             env.action_space.seed(seed)
             env.observation_space.seed(seed)
             return env
         else:
-            env_.seed(seed)
+            env_.set_seed(seed)
             env_.action_space.seed(seed)
             env_.observation_space.seed(seed)
             return env_

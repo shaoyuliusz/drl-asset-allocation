@@ -1,6 +1,6 @@
 {
   "init_params": {
-    "exp_name": "experiment_1",
+    "exp_name": "experiment_2",
     "seed": null,
     "torch_deterministic": true,
     "cuda": true,

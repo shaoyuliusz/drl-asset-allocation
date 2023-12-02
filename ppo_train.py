@@ -3,6 +3,7 @@ import os
 import random
 import time
 from distutils.util import strtobool
+from itertools import count
 import pandas as pd
 
 import gymnasium as gym
@@ -41,12 +42,12 @@ def parse_args():
     # Algorithm specific arguments
     parser.add_argument("--learning-rate", type=float, default=2.5e-4,
         help="the learning rate of the optimizer")
-    parser.add_argument("--total-timesteps", type=int, default=50000,
-        help="total timesteps of the experiments")
+    # parser.add_argument("--total-timesteps", type=int, default=50000,
+    #     help="total timesteps of the experiments")
     parser.add_argument("--num-envs", type=int, default=1,
         help="the number of parallel game environments")
-    parser.add_argument("--num-steps", type=int, default=128,
-        help="the number of steps to run in each environment per policy rollout")
+    parser.add_argument("--num-episodes", type=int, default=100,
+        help="the number of episodes to run")
     parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="Toggle learning rate annealing for policy and value networks")
     parser.add_argument("--gae", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
@@ -55,8 +56,8 @@ def parse_args():
         help="the discount factor gamma")
     parser.add_argument("--gae-lambda", type=float, default=0.95,
         help="the lambda for the general advantage estimation")
-    parser.add_argument("--num-minibatches", type=int, default=4,
-        help="the number of mini-batches")
+    # parser.add_argument("--num-minibatches", type=int, default=4,
+    #     help="the number of mini-batches")
     parser.add_argument("--update-epochs", type=int, default=4,
         help="the K epochs to update the policy")
     parser.add_argument("--norm-adv", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
@@ -74,8 +75,8 @@ def parse_args():
     parser.add_argument("--target-kl", type=float, default=None, #0.015
         help="the target KL divergence threshold")
     args = parser.parse_args()
-    args.batch_size = int(args.num_envs * args.num_steps)
-    args.minibatch_size = int(args.batch_size // args.num_minibatches)
+    #args.batch_size = int(args.num_envs * args.num_steps)
+    #args.minibatch_size = int(args.batch_size // args.num_minibatches)
     # fmt: on
     return args
 
@@ -108,10 +109,10 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    #df = pd.read_csv("data/yahoo_finance_train.csv")
-    df = pd.DataFrame({'AAPL':[50, 100], "JPM": [100, 50]})
-    stock_env_trade = StockEnvTrade(df = df.head(2))
-    
+    df = pd.read_csv("data/yahoo_finance_train.csv")
+    #df = pd.DataFrame({'AAPL':[50, 100], "JPM": [100, 50]})
+    stock_env_trade = StockEnvTrade(df)
+    n_days = len(df)
     
     # env setup
     envs = gym.vector.SyncVectorEnv(
@@ -127,12 +128,12 @@ if __name__ == "__main__":
 
     # ALGO Logic: Storage setup
 
-    obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device) #torch.Size([num_steps, num_envs, 17])
-    actions = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(device) #torch.Size([num_steps, num_envs, 8])
-    logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    values = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    obs = torch.zeros((n_days, args.num_envs) + envs.single_observation_space.shape).to(device) #torch.Size([num_steps, num_envs, 17])
+    actions = torch.zeros((n_days, args.num_envs) + envs.single_action_space.shape).to(device) #torch.Size([num_steps, num_envs, 8])
+    logprobs = torch.zeros((n_days, args.num_envs)).to(device)
+    rewards = torch.zeros((n_days, args.num_envs)).to(device)
+    dones = torch.zeros((n_days, args.num_envs)).to(device)
+    values = torch.zeros((n_days, args.num_envs)).to(device)
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
@@ -141,16 +142,17 @@ if __name__ == "__main__":
     
     next_obs = torch.Tensor(obs_).to(device) #(1, 17) shaped tensor
     next_done = torch.zeros(args.num_envs).to(device) #next_done[i] corresponds to the ith sub-environment being not done and done.
-    num_updates = args.total_timesteps // args.batch_size
+    #num_updates = args.total_timesteps // args.batch_size
    
-    for update in range(1, num_updates + 1):
+    for episode in range(1, args.num_episodes + 1):
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
-            frac = 1.0 - (update - 1.0) / num_updates
+            frac = 1.0 - (episode - 1.0) / args.num_episodes
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
         # ROLLOUT PHASE
-        for step in range(0, args.num_steps):
+        #for step in range(0, args.num_steps):
+        for step in range(n_days):
             global_step += 1 * args.num_envs
             obs[step] = next_obs
             dones[step] = next_done
@@ -180,11 +182,6 @@ if __name__ == "__main__":
                             writer.add_scalar("charts/episodic_return", obj["episodic_return"], global_step)
                             writer.add_scalar("charts/episodic_length", obj["episode"]["l"], global_step)
                             break
-                        # if "episode" in obj:
-                        #     print(f"global_step={global_step}, episodic_return={obj['episode']['r']}") #cumulative rewards in an episode
-                        #     writer.add_scalar("charts/episodic_return", obj["episode"]["r"], global_step)
-                        #     writer.add_scalar("charts/episodic_length", obj["episode"]["l"], global_step)
-                        #     break
         
         # bootstrap value if not done
         with torch.no_grad():
@@ -192,8 +189,8 @@ if __name__ == "__main__":
             if args.gae:
                 advantages = torch.zeros_like(rewards).to(device) #torch.Size([num_steps, 1])
                 lastgaelam = 0
-                for t in reversed(range(args.num_steps)):
-                    if t == args.num_steps - 1:
+                for t in reversed(range(n_days)):
+                    if t == n_days - 1:
                         nextnonterminal = 1.0 - next_done
                         nextvalues = next_value
                     else:
@@ -204,8 +201,8 @@ if __name__ == "__main__":
                 returns = advantages + values
             else:
                 returns = torch.zeros_like(rewards).to(device)               
-                for t in reversed(range(args.num_steps)):
-                    if t == args.num_steps - 1:
+                for t in reversed(range(n_days)):
+                    if t == n_days - 1:
                         nextnonterminal = 1.0 - next_done
                         next_return = next_value
                     else:
@@ -213,11 +210,11 @@ if __name__ == "__main__":
                         next_return = returns[t + 1]
                     returns[t] = rewards[t] + args.gamma * nextnonterminal * next_return
                 advantages = returns - values
-
+        #print("obs.shape", obs.shape) [1409, 1, 17]
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
-        #print("envs.single_observation_space.shape", (8,)
-        #print("b_obs shape: ", b_obs.shape) #(512,8)
+        #print("envs.single_observation_space.shape",envs.single_observation_space.shape) #(17,)
+        #print("b_obs shape: ", b_obs.shape) #[1409, 17]
         b_logprobs = logprobs.reshape(-1)
         b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
         b_advantages = advantages.reshape(-1)
@@ -226,16 +223,16 @@ if __name__ == "__main__":
 
         #LEARNING PHASE
         # Optimizing the policy and value network
-        b_inds = np.arange(args.batch_size) #batch indices
+        #b_inds = np.arange(args.batch_size) #batch indices
         clipfracs = []
         for epoch in range(args.update_epochs):
-            np.random.shuffle(b_inds) #shuffle batch indices
-            for start in range(0, args.batch_size, args.minibatch_size):
-                end = start + args.minibatch_size #128 mini batch per time
-                mb_inds = b_inds[start:end]
+            #np.random.shuffle(b_inds) #shuffle batch indices
+            for start in range(0, n_days):
+                #end = start + args.minibatch_size #128 mini batch per time
+                #mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
-                logratio = newlogprob - b_logprobs[mb_inds]
+                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs, b_actions)
+                logratio = newlogprob - b_logprobs
 
                 ratio = logratio.exp()
 
@@ -249,7 +246,7 @@ if __name__ == "__main__":
                     approx_kl = ((ratio - 1) - logratio).mean()
                     clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
 
-                mb_advantages = b_advantages[mb_inds] #advantage of a batch
+                mb_advantages = b_advantages #advantage of a batch
                 if args.norm_adv:
                     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
@@ -259,19 +256,20 @@ if __name__ == "__main__":
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
-                newvalue = newvalue.view(-1)
+                newvalue = newvalue.view(-1) #shape=[1409]
+
                 if args.clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                    v_clipped = b_values[mb_inds] + torch.clamp(
-                        newvalue - b_values[mb_inds],
+                    v_loss_unclipped = (newvalue - b_returns) ** 2
+                    v_clipped = b_values + torch.clamp(
+                        newvalue - b_values,
                         -args.clip_coef,
                         args.clip_coef,
                     )
-                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                    v_loss_clipped = (v_clipped - b_returns) ** 2
                     v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
                     v_loss = 0.5 * v_loss_max.mean()
                 else:
-                    v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
+                    v_loss = 0.5 * ((newvalue - b_returns) ** 2).mean()
 
                 entropy_loss = entropy.mean()
                 loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef #the total loss function

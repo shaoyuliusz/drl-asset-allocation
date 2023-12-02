@@ -48,8 +48,8 @@ def DRL_prediction(df_test: pd.DataFrame, model, env: gym.Env, test_obs) -> np.a
            
         if i == (len(df_test.index.unique()) - 2): #351
             #access the original environment
-            env = env.env_fns[0]()
-            actions_memory = env.save_action_memory()
+            _env = env.env_fns[0]()
+            actions_memory = _env.save_action_memory()
     
     return actions_memory #this must be (days X n_stocks)
 
@@ -64,12 +64,12 @@ def make_env_test(env_: gym.Env, seed:int, use_normalization: bool = True):
             env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, 0, 10)) #observation clipping
             env = gym.wrappers.NormalizeReward(env) #reward scaling
             env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10)) #reward clipping
-            env.seed(seed)
+            env.set_seed(seed)
             env.action_space.seed(seed)
             env.observation_space.seed(seed)
             return env
         else:
-            env_.seed(seed)
+            env_.set_seed(seed)
             env_.action_space.seed(seed)
             env_.observation_space.seed(seed)
             return env_

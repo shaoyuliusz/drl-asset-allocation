@@ -28,7 +28,7 @@ from src.utils.common_utils import (dict_to_namedtuple,
 #     "normalize_env": [True, False]
 # }
 
-param_grid = {
+PARAM_GRID = {
     'learning_rate': [2.5e-5, 2.5e-4, 2.5e-3],
     'total_timesteps': [25000, 50000, 75000],
     'num_steps': [256, 1024],
@@ -38,19 +38,22 @@ param_grid = {
     "anneal_lr": [True, False],
 }
 
-Keys = param_grid.keys()
-PARAM_SETS = [dict(zip(Keys, values)) for values in itertools.product(*param_grid.values())]
+KEYS = PARAM_GRID.keys()
+PARAM_SETS = [dict(zip(KEYS, values)) for values in itertools.product(*PARAM_GRID.values())]
 
 N_RUNS = 5 #average performance over 5 runs
+CONFIG_PATH = "configs/ppo/basic_config.json"
+TRAIN_DATA_PATH = "data/yahoo_finance_train.csv"
+TEST_DATA_PATH = "data/yahoo_finance_test.csv"
 
 def main():
-    with open('configs/ppo/basic_config.json') as f:
+    with open(CONFIG_PATH) as f:
         config_dict = json.load(f)
 
     result = defaultdict(dict)
 
-    df_train = pd.read_csv("data/yahoo_finance_train.csv")
-    df_test = pd.read_csv("data/yahoo_finance_test.csv")
+    df_train = pd.read_csv(TRAIN_DATA_PATH)
+    df_test = pd.read_csv(TEST_DATA_PATH)
 
     for i, params_dict in tqdm.tqdm(enumerate(PARAM_SETS)):
         config = replace_dict(config_dict, params_dict)

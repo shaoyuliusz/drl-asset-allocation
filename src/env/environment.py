@@ -16,7 +16,6 @@ class StockEnvTrade(gym.Env):
     """A stock trading environment for OpenAI gym"""
     metadata = {'render.modes': ['human']}
     def __init__(self, df:pd.DataFrame, day:int=0, initial:bool=True):
-        
         self.df = df
         self.day = day
         self.initial = initial 
@@ -127,7 +126,7 @@ class StockEnvTrade(gym.Env):
 
 
     def reset(self, seed = None, options = None) -> tuple[ObsType, dict]:  
-        super().reset(seed=seed)
+        #super().reset(seed=seed)
         self.day = 0
         self.data = self.df.iloc[self.day,:]
         self.terminal = False 
@@ -138,9 +137,12 @@ class StockEnvTrade(gym.Env):
         #initiate state
         self.state = [INITIAL_ACCOUNT_BALANCE] + self.data.values.tolist() + [0]*self.stock_dim
         self.cum_reward = 0
+
+        #self._seed(1)
         
         #info placeholder, not implemented!
         return self.state, {}
+    
     
     
     def normalization(self, actions):
@@ -156,8 +158,9 @@ class StockEnvTrade(gym.Env):
         return self.state
     
 
-    def seed(self, seed=None):
+    def set_seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
+        self.seed = seed
         return [seed]
 
 
