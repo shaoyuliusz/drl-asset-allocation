@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "final-project"
 version = "0.1.0"
-description = ""
+description = "final project for reinforcement learning Fall 2023"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 
@@ -14,8 +14,12 @@ pytest-cov = "^4.1.0"
 pylint = "^3.0.2"
 mypy = "^1.7.0"
 codecov = "^2.1.13"
-gymnasium = "^0.29.1"
+gymnasium = {extras = ["mujoco"], version = "^0.29.1"}
 torch = "^2.1.1"
+wandb = "^0.16.0"
+pandas-datareader = "^0.10.0"
+stable-baselines3 = "^2.2.1"
+matplotlib = "^3.8.2"
 
 
 [build-system]
