@@ -39,21 +39,20 @@ class PPOAgent:
         self.init_params = init_params
         self.algo_params = algo_params
 
-        self.batch_size = int(self.algo_params.num_envs * self.algo_params.num_steps)
-        self.minibatch_size = int(self.batch_size // self.algo_params.num_minibatches)
+        self.batch_size = int(self.algo_params.num_envs * self.algo_params.num_steps) #128
+        self.minibatch_size = int(self.batch_size // self.algo_params.num_minibatches) #128/4
         
         if not model_num:
             model_num = np.random.randint(10000)
-            save_path = os.path.join(self.init_params.save_path, f"ppo_{model_num}")
             while os.path.exists(save_path):
                 model_num = np.random.randint(10000)
         
-        save_path = os.path.join(self.init_params.save_path, f"ppo_{model_num}")
+        save_path = os.path.join(self.init_params.save_path, self.init_params.exp_name)
         self.model_num = model_num
         self.save_path = save_path
 
         hyper_params = self.init_params._asdict() | self.algo_params._asdict()
-        writer = SummaryWriter(os.path.join(save_path, f"{self.init_params.exp_name}"))
+        writer = SummaryWriter(os.path.join(save_path, f"{self.model_num}"))
         writer.add_text(
             "hyperparameters",
             "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in hyper_params.items()])),
@@ -72,7 +71,7 @@ class PPOAgent:
 
         stock_env_trade = self.env(self.data)
         self.model_envs = gym.vector.SyncVectorEnv(
-            [make_env(env_ = stock_env_trade, seed = i) for i in range(self.algo_params.num_envs)]
+            [make_env(env_ = stock_env_trade, seed = i, use_normalization=self.algo_params.normalize_env) for i in range(self.algo_params.num_envs)]
             )
         
         assert isinstance(self.model_envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
@@ -113,6 +112,7 @@ class PPOAgent:
                 frac = 1.0 - (update - 1.0) / num_updates
                 lrnow = frac * self.algo_params.learning_rate
                 self.optimizer.param_groups[0]["lr"] = lrnow
+            
             # ROLLOUT PHASE
             for step in range(0, self.algo_params.num_steps):
                 global_step += 1 * self.algo_params.num_envs
@@ -132,15 +132,15 @@ class PPOAgent:
 
                 # execute the game and log data.
                 next_obs, reward, done, _, info = self.model_envs.step(action.cpu().numpy())
-                
-                self.rewards[step] = torch.tensor(reward).to(self.device).view(-1)
+
+                self.rewards[step] = torch.Tensor(reward).to(self.device).view(-1)
                 next_obs, next_done = torch.Tensor(next_obs).to(self.device), torch.Tensor(done).to(self.device)
 
                 for item in info:
                     if item == "final_info":
                         for obj in info[item]:
                             if "episode" in obj:
-                                print(f"global_step={global_step}, episodic_return={obj['episodic_return']}") #cumulative rewards in an episode
+                                print(f"global_step={global_step}, episodic_return={obj['episodic_return']}, episodic_length={obj['episode']['l']}") #cumulative rewards in an episode
                                 self.writer.add_scalar("charts/episodic_return", obj["episodic_return"], global_step)
                                 self.writer.add_scalar("charts/episodic_length", obj["episode"]["l"], global_step)
                                 break
@@ -163,7 +163,7 @@ class PPOAgent:
                     returns = advantages + self.values
                 else:
                     returns = torch.zeros_like(self.rewards).to(self.device)               
-                    for t in reversed(range(self.algo_params.num_steps)):
+                    for t in reversed(range(self.algo_params.num_steps)): #reward-to-go https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html#implementing-reward-to-go-policy-gradient
                         if t == self.algo_params.num_steps - 1:
                             nextnonterminal = 1.0 - next_done
                             next_return = next_value
@@ -175,8 +175,6 @@ class PPOAgent:
 
             # flatten the batch
             b_obs = self.obs.reshape((-1,) + self.model_envs.single_observation_space.shape)
-            #print("envs.single_observation_space.shape", (8,)
-            #print("b_obs shape: ", b_obs.shape) #(512,8)
             b_logprobs = self.logprobs.reshape(-1)
             b_actions = self.actions.reshape((-1,) + self.model_envs.single_action_space.shape)
             b_advantages = advantages.reshape(-1)
@@ -266,27 +264,34 @@ class PPOAgent:
         print("Training time: ", (time.time()- start_time)/60, " minutes")
         print(f"start saving model to {self.save_path}")
 
+    def save(self):
         #save model
-        torch.save(self.agent.state_dict(), os.path.join(self.save_path,"torch_ppo.pt"))
+        torch.save(self.agent.state_dict(), os.path.join(self.save_path, self.model_num, "torch_ppo.pt"))
 
         #save hyperparameters
         hyper_params = self.init_params._asdict() | self.algo_params._asdict()
         with open(os.path.join(self.save_path, 'hyper_params.json'), 'w') as fp:
             json.dump(hyper_params, fp)
 
-def make_env(env_: gym.Env, seed:int) -> Callable[[], gym.Env]:
+def make_env(env_: gym.Env, seed:int, use_normalization: bool=True) -> Callable[[], gym.Env]:
     def thunk():
-        #env = gym.make(gym_id)
-        env = gym.wrappers.RecordEpisodeStatistics(env_)
-        env = gym.wrappers.ClipAction(env)
-        env = gym.wrappers.NormalizeObservation(env) #observation scaling
-        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10)) #observation clipping
-        env = gym.wrappers.NormalizeReward(env) #reward scaling
-        env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10)) #reward clipping
-        env.seed(seed)
-        env.action_space.seed(seed)
-        env.observation_space.seed(seed)
-        return env
+        if use_normalization:
+            #env = gym.make(gym_id)
+            env = gym.wrappers.RecordEpisodeStatistics(env_)
+            env = gym.wrappers.ClipAction(env)
+            env = gym.wrappers.NormalizeObservation(env) #observation scaling
+            env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, 0, 10)) #observation clipping
+            env = gym.wrappers.NormalizeReward(env) #reward scaling
+            env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10)) #reward clipping
+            env.seed(seed)
+            env.action_space.seed(seed)
+            env.observation_space.seed(seed)
+            return env
+        else:
+            env_.seed(seed)
+            env_.action_space.seed(seed)
+            env_.observation_space.seed(seed)
+            return env_
     return thunk
 
 
@@ -329,8 +334,10 @@ class Agent(nn.Module):
         self.actor_logstd = nn.Parameter(torch.zeros(1, output_dims)) #np.prod(envs.single_action_space.shape)
         self.envs = envs
 
+
     def get_value(self, x):
         return self.critic(x)
+    
 
     def get_action_and_value(self, x, action=None):
         """
@@ -347,17 +354,16 @@ class Agent(nn.Module):
         #print("action_mean shape", action_mean.shape) [1,8]
         action_logstd = self.actor_logstd.expand_as(action_mean)
         action_std = torch.exp(action_logstd)
-        probs = Normal(action_mean, action_std)
-        #print("action space", self.envs.action_space)
-        #print("single action space", self.envs.single_action_space)
+        probs = Normal(action_mean, action_std) #Creates a normal distribution parameterized by action_mean and action_std
+
         if action is None:
             action = probs.sample()
             # Actions could be on arbitrary scale, so clip the actions to avoid
             # out of bound error (e.g. if sampling from a Gaussian distribution)
         
         #clip action, see https://ai.stackexchange.com/questions/28572/how-to-define-a-continuous-action-distribution-with-a-specific-range-for-reinfor
-        action = np.clip(action, self.envs.single_action_space.low, self.envs.single_action_space.high)
-        assert torch.all((action >= -1) & (action <= 1)), "Not all elements are in the interval [-1, 1]"
+        #action = np.clip(action, self.envs.single_action_space.low, self.envs.single_action_space.high)
+        #assert torch.all((action >= -1) & (action <= 1)), "Not all elements are in the interval [-1, 1]"
 
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 

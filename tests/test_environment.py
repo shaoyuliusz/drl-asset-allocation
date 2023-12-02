@@ -1,27 +1,12 @@
 import pytest
 import gymnasium as gym
-import pandas as pd
 import numpy as np
 import math
-from src.env.environment import StockEnvTrade
+
 from src.models.ppo.ppo import make_env
 
 SEED = 123
-TEST_DATA_FILE = "data/yahoo_finance_test.csv"
 NUM_STEPS = 100
-
-@pytest.fixture
-def test_envs():
-    test_data = pd.read_csv(TEST_DATA_FILE)
-    test_env_1 = StockEnvTrade(test_data)
-    test_env_2 = StockEnvTrade(test_data)
-    return [test_env_1, test_env_2]
-
-@pytest.fixture
-def test_env():
-    test_data = pd.read_csv(TEST_DATA_FILE)
-    test_env = StockEnvTrade(test_data)
-    return test_env
 
 
 def assert_equals(a, b, prefix=None):
@@ -64,8 +49,8 @@ def test_actions_memory(test_env: gym.Env) -> None:
     
     actions_memory = test_env.save_action_memory()
     for act in actions_memory:
-        assert len(act) == test_env.action_space.shape[0] #number of actions = 8
-        assert math.isclose(np.sum(act), 1) #if normalized actions (stock share weights) sum to 1
+        assert len(act) == test_env.action_space.shape[0], "number of actions in actions memory must equal to action space size (8)"
+        assert math.isclose(np.sum(act), 1, rel_tol = 1e-05), "normalized actions (stock share weights) must sum to 1"
 
     test_env.close()
 
@@ -90,6 +75,8 @@ def test_env_determinism_rollout(test_envs):
 
     env_1.action_space.seed(SEED)
     env_2.action_space.seed(SEED)
+    env_1.observation_space.seed(SEED)
+    env_2.observation_space.seed(SEED)
 
     for time_step in range(NUM_STEPS):
         action = env_1.action_space.sample()
@@ -97,15 +84,15 @@ def test_env_determinism_rollout(test_envs):
 
         obs_1, rew_1, terminated_1, truncated_1, info_1 = env_1.step(action)
         obs_2, rew_2, terminated_2, truncated_2, info_2 = env_2.step(action)
-        print(obs_1)
-        print(obs_2)
-        
-        print(rew_1)
-        print(rew_2)
+
         assert_equals(obs_1, obs_2, f"[{time_step}] ")
         assert env_1.observation_space.contains(
             obs_1
-        )  # obs_2 verified by previous assertion
+        )  
+
+        assert env_2.observation_space.contains(
+            obs_2
+        )  
 
         assert rew_1 == rew_2, f"[{time_step}] reward 1={rew_1}, reward 2={rew_2}"
         assert (
