@@ -67,10 +67,10 @@ def test_env_determinism_rollout(test_envs):
     - obs, rew, done and info are equals between the two envs
     """
     env_1, env_2 = test_envs
-    env_1.seed(SEED)
-    env_2.seed(SEED)
-    initial_obs_1, initial_info_1 = env_1.reset(seed=SEED)
-    initial_obs_2, initial_info_2 = env_2.reset(seed=SEED)
+    env_1.set_seed(SEED)
+    env_2.set_seed(SEED)
+    initial_obs_1, initial_info_1 = env_1.reset()
+    initial_obs_2, initial_info_2 = env_2.reset()
     assert_equals(initial_obs_1, initial_obs_2)
 
     env_1.action_space.seed(SEED)
@@ -80,10 +80,11 @@ def test_env_determinism_rollout(test_envs):
 
     for time_step in range(NUM_STEPS):
         action = env_1.action_space.sample()
+        action_ = action.copy() #copy the action since action will be modified by env.step()
         assert env_1.action_space.contains(action)
 
         obs_1, rew_1, terminated_1, truncated_1, info_1 = env_1.step(action)
-        obs_2, rew_2, terminated_2, truncated_2, info_2 = env_2.step(action)
+        obs_2, rew_2, terminated_2, truncated_2, info_2 = env_2.step(action_)
 
         assert_equals(obs_1, obs_2, f"[{time_step}] ")
         assert env_1.observation_space.contains(
@@ -106,8 +107,8 @@ def test_env_determinism_rollout(test_envs):
         if (
             terminated_1 or truncated_1
         ):  # terminated_2, truncated_2 verified by previous assertion
-            env_1.reset(seed=SEED)
-            env_2.reset(seed=SEED)
+            env_1.reset()
+            env_2.reset()
 
     env_1.close()
     env_2.close()
