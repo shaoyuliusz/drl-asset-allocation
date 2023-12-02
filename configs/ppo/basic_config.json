@@ -8,13 +8,13 @@
     "wandb_project_name": "ppo-implementation-details",
     "wandb_entity": null,
     "save_model": true,
-    "save_path": "/Users/apple/Documents/reinforcement_learning/final_project/models/ppo"
+    "save_path": "/Users/apple/Documents/reinforcement_learning/final_project/models/ppo2"
   },  
   "algo_params": {
     "learning_rate": 2.5e-4,
     "total_timesteps": 50000,
     "num_envs": 1,
-    "num_steps": 128,
+    "num_steps": 2048,
     "anneal_lr": true,
     "gae": true,
     "gamma": 1.0,
@@ -27,6 +27,7 @@
     "ent_coef": 0.01,
     "vf_coef": 0.5,
     "max_grad_norm": 0.5,
-    "target_kl": null
+    "target_kl": null, 
+    "normalize_env": true
   }
 }
