@@ -42,7 +42,7 @@ KEYS = PARAM_GRID.keys()
 PARAM_SETS = [dict(zip(KEYS, values)) for values in itertools.product(*PARAM_GRID.values())]
 
 N_RUNS = 5 #average performance over 5 runs
-CONFIG_PATH = "configs/ppo/basic_config.json"
+CONFIG_PATH = "configs/ppo_config.json"
 TRAIN_DATA_PATH = "data/yahoo_finance_train.csv"
 TEST_DATA_PATH = "data/yahoo_finance_test.csv"
 
