@@ -33,7 +33,12 @@ def data_cleaner(df: pd.DataFrame) -> tuple([pd.DataFrame, pd.DataFrame]):
 
 if __name__ == "__main__":
     df_stock = data_loader(STOCKS_LIST)
-    df_train, df_test = data_cleaner(df_stock)
+    df_train, df_val = data_cleaner(df_stock)
+    df_test = data_loader(STOCKS_LIST, start_date='2017-01-01', end_date="2018-05-30")
+
     df_train.to_csv("data/yahoo_finance_train.csv", index=False)
+    df_val.to_csv("data/yahoo_finance_val.csv", index=False)
     df_test.to_csv("data/yahoo_finance_test.csv", index=False)
+
+    
 
