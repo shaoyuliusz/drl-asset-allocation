@@ -9,11 +9,12 @@ import tqdm
 import os
 from collections import defaultdict
 
-from src.models.ppo import Agent, PPOAgent
+from src.models.ppo import PPOAgent
 from src.env.environment import StockEnvTrade
 from src.utils.common_utils import (dict_to_namedtuple, 
                                     replace_dict, 
                                     DRL_prediction,
+                                    Agent, 
                                     make_env_test
                                     )
 

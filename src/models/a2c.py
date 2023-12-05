@@ -7,13 +7,11 @@ import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from typing import Callable
-from torch.distributions.normal import Normal
 from typing import Union
 from torch.utils.tensorboard import SummaryWriter
 from collections import namedtuple
 
-from utils.common_utils import Agent, make_env
+from ..utils.common_utils import make_env
 
 class A2CAgent:
     def __init__(self, 

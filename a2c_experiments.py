@@ -8,11 +8,12 @@ import tqdm
 import os
 from collections import defaultdict
 
-from src.models.a2c import Agent, A2CAgent
+from src.models.a2c import A2CAgent
 from src.env.environment import StockEnvTrade
 from src.utils.common_utils import (dict_to_namedtuple, 
                                     replace_dict, 
                                     DRL_prediction,
+                                    Agent, 
                                     make_env_test
                                     )
 

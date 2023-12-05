@@ -11,7 +11,7 @@ from typing import Union
 from torch.utils.tensorboard import SummaryWriter
 from collections import namedtuple
 
-from utils.common_utils import Agent, make_env
+from ..utils.common_utils import make_env
 
 class PPOAgent:
     def __init__(self, 
@@ -25,13 +25,12 @@ class PPOAgent:
         """
         Initialize a new PPOAgent class
         Args:
-            data
-            env
-            agent_model
-            writer
-            init_params:
-            algo_params: a namedtuple of algorithm parameters
-            model_num:
+            data: training/test stock data
+            env: custom environment class
+            agent_model: an nn.Module class for agent including policy and val networks
+            init_params: namedtuple of model initialization parameters
+            algo_params: namedtuple of algorithm parameters
+            model_num: model number
         """
         self.data = data
         self.env = env
