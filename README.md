@@ -1,26 +1,31 @@
-# Asset Allocation: From Markowitz to Deep Reinforcement Learning
+# Deep Reinforcement Learning in Markowitz Asset Allocation
 
-
-PyTorch implementation of **Asset Allocation: From Markowitz to Deep Reinforcement Learning**.
-
-<p align="left"><img width="50%" src="images/main.PNG" /></p>
+This repository contains code and introduction to training deep reinforcement agents for asset allocation. In particular, it contains our implementation of Actor-Critic (A2C) and PPO algorithms, with code level optimizations and experiments. 
 
 ## Overview
 
-Asset allocation is an investment strategy that aims to balance risk and reward by constantly redistributing the portfolio's assets according to certain goals, risk tolerance, and investment horizon. Unfortunately, there is no simple formula that can find the right allocation for every individual. As a result, investors may use different asset allocations' strategy to try to fulfill their financial objectives. In this work, we conduct an extensive benchmark study to determine the efficacy and reliability of a number of optimization techniques. In particular, we focus on traditional approaches based on Modern Portfolio Theory, and on machine-learning approaches based on deep reinforcement learning. We assess the model's performance under different market tendency, i.e., both bullish and bearish markets.
+In this project, we use deep reinforcement learning to address asset allocation problem in finance. We demonstrate this on daily data for a number of stocks in the US equities with daily re-balancing. In particular, we apply classic reinforcement learning algorithms, such as actor-critic (A2C) and proximal policy optimization (PPO) algorithms to dynamically optimize asset allocation to maximize stock returns. Through objective evaluation of performance and careful ablation studies, we aim to dive deep to the algorithm implementation details, evaluate their performance against classical optimization methodologies： Mean-Variance and Sharpe-CVaR optimization. We horizontally compared the results in dimensions of profit derivation, risk maximum draw-down and volatility to provide empirical evidence on reinforcement learning's feasibility as a robust tools in contributing to asset allocation.
 
-<p align="left"><img width="100%" src="images/results.PNG" /></p>
+## Project Structure
+1 - The main results in the paper are in the folder `notebooks`.
+    * `ablation-studies.ipynb` reports our ablation study results.
+    * `plot_best_models.ipynb` compares our reinforcement learning agents with baseline models in test data.
 
-## Code
-The repository contains two files:
- <ul>
-  <li> DeepRL.py -> The reincorcement environment for asset allocation and its fucntions</li>
-  <li> main.ipnyb -> The Jupyter notebook</li>
-</ul> 
-
-To use the code, we only need to run the `main.ipnyb` notebook. Note that you might need to installl thrid party libraries such as [stable_baselines3](https://stable-baselines3.readthedocs.io/en/master/), [pandas_datareader](https://pandas-datareader.readthedocs.io/en/latest/) and [pyfolio](https://github.com/quantopian/pyfolio).
-
-## Citation
+2 - The default configuration files for training PPO and A2C agents are in `experiment_configs` folder. To perform grid search for model hyperparameters, please edit the PARAM_GRID variable in ppo_experiments.py, and make a new `experiment` folder to train new agents. For example,
+```python
+PARAM_GRID = {
+    'learning_rate': [2.5e-3],
+    'total_timesteps': [100000, 150000],
+    'num_steps': [1024],
+    'gae': [True, False],
+    'norm_adv': [True, False],
+    "normalize_env": [True],
+    "anneal_lr": [True, False],
+}
 ```
 
-```
+3 - `src/models` folder contains our A2C in `a2c.py` and PPO models in `ppo.py`, `src/env` folder sets up our custom stock trading environment, `example_models` folder provides such example trained models.
+
+## References
+
+The PPO implementation is based on the open-source code in [**Huang, et al., "The 37 Implementation Details of Proximal Policy Optimization ICLR Blog Track, 2022"**](https://github.com/vwxyzjn/ppo-implementation-details/blob/main/ppo.py).

@@ -1,9 +1,6 @@
 # Ignore compiled Python files
 *.pyc
 
-#Ignore trained model results
-models/
-
 # Ignore virtual environment
 venv/
 

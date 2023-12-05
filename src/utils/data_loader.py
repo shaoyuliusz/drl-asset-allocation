@@ -17,14 +17,13 @@ def data_loader(stock_names: list[str], start_date='2010-01-01', end_date="2017-
     
     return df
 
-def data_cleaner(df: pd.DataFrame) -> tuple([pd.DataFrame, pd.DataFrame]):
+def data_cleaner(df: pd.DataFrame, train_pct:float = 0.8) -> tuple([pd.DataFrame, pd.DataFrame]):
     """clean loaded data"""
     
     df['Adj Close'] = df['Adj Close'].ffill()
     df['Adj Close'] = df['Adj Close'].bfill()
     df = df['Adj Close']
     
-    train_pct = 0.8
     samples_train = int(train_pct*len(df))
     data_train = df[:samples_train]
     data_test = df[samples_train:]
