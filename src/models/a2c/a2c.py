@@ -29,9 +29,9 @@ class A2CAgent:
             env
             agent_model
             writer
-            init_params
-            algo_params
-            model_num
+            init_params:
+            algo_params: a namedtuple of algorithm parameters
+            model_num:
         """
         self.data = data
         self.env = env
@@ -40,11 +40,9 @@ class A2CAgent:
         self.algo_params = algo_params
 
         self.batch_size = int(self.algo_params.num_envs * self.algo_params.num_steps) #128
-        self.minibatch_size = int(self.batch_size // self.algo_params.num_minibatches) #128/4
         
         if not model_num:
             model_num = np.random.randint(10000)
-            save_path = os.path.join(self.init_params.save_path, f"ac_{model_num}")
             while os.path.exists(save_path):
                 model_num = np.random.randint(10000)
         
@@ -123,9 +121,6 @@ class A2CAgent:
                 # ALGO LOGIC: action logic
                 with torch.no_grad():
                     action, logprob, _, value = self.agent.get_action_and_value(next_obs)
-                    # print("action: ",action) (8,) tensor
-                    # print("logprob", logprob) (8,) tensor
-                    # print("value", value) (1,1) tensor e.g tensor([[0.1514]])
                     self.values[step] = value.flatten()
                 
                 self.actions[step] = action
@@ -163,7 +158,7 @@ class A2CAgent:
                         advantages[t] = lastgaelam = delta + self.algo_params.gamma * self.algo_params.gae_lambda * nextnonterminal * lastgaelam
                     returns = advantages + self.values
                 else:
-                    returns = torch.zeros_like(self.rewards).to(self.device)               
+                    returns = torch.zeros_like(self.rewards).to(self.device)    
                     for t in reversed(range(self.algo_params.num_steps)): #reward-to-go https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html#implementing-reward-to-go-policy-gradient
                         if t == self.algo_params.num_steps - 1:
                             nextnonterminal = 1.0 - next_done
@@ -184,35 +179,22 @@ class A2CAgent:
 
             #LEARNING PHASE
             # Optimizing the policy and value network
-            b_inds = np.arange(self.batch_size) #batch indices
-            clipfracs = []
-            for epoch in range(self.algo_params.update_epochs):
-                np.random.shuffle(b_inds) #shuffle batch indices
-                for start in range(0, self.batch_size, self.minibatch_size):
-                    end = start + self.minibatch_size #128 mini batch per time
-                    mb_inds = b_inds[start:end]
+            for step in range(0, self.batch_size):
+                _, newlogprob, entropy, newvalue = self.agent.get_action_and_value(b_obs, b_actions)
 
-                    _, newlogprob, entropy, newvalue = self.agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
-                    
-                    mb_advantages = b_advantages[mb_inds] #advantage of a batch
-                    if self.algo_params.norm_adv:
-                        mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
+                # Policy loss
+                pg_loss = -(newlogprob*b_advantages).mean()
 
-                    # Policy loss
-                    pg_loss = -(newlogprob*mb_advantages).mean()
+                # Value loss
+                v_loss = 0.5 * ((newvalue - b_returns) ** 2).mean()
 
-                    # Value loss
-                    newvalue = newvalue.view(-1)
-                    v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
+                entropy_loss = entropy.mean()
+                loss = pg_loss - self.algo_params.ent_coef * entropy_loss + v_loss * self.algo_params.vf_coef #the total loss function
 
-                    loss = pg_loss + v_loss#the total loss function
-
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    #nn.utils.clip_grad_norm_(self.agent.parameters(), self.algo_params.max_grad_norm) #Global Gradient Clipping
-                    self.optimizer.step()
-
-                
+                self.optimizer.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(self.agent.parameters(), self.algo_params.max_grad_norm) #Global Gradient Clipping
+                self.optimizer.step()
 
             y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
             var_y = np.var(y_true)
@@ -222,10 +204,7 @@ class A2CAgent:
             self.writer.add_scalar("charts/learning_rate", self.optimizer.param_groups[0]["lr"], global_step)
             self.writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
             self.writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
-            #self.writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
-            #self.writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), global_step)
-            #self.writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
-            self.writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
+            self.writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
             self.writer.add_scalar("losses/explained_variance", explained_var, global_step)
             self.writer.add_scalar("losses/total_loss", loss.item(), global_step)
             self.writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
@@ -238,7 +217,7 @@ class A2CAgent:
 
     def save(self):
         #save model
-        torch.save(self.agent.state_dict(), os.path.join(self.save_path, self.model_num, "torch_a2c.pt"))
+        torch.save(self.agent.state_dict(), os.path.join(self.save_path, self.model_num, "torch_ppo.pt"))
 
         #save hyperparameters
         hyper_params = self.init_params._asdict() | self.algo_params._asdict()
@@ -246,6 +225,15 @@ class A2CAgent:
             json.dump(hyper_params, fp)
 
 def make_env(env_: gym.Env, seed:int, use_normalization: bool=True) -> Callable[[], gym.Env]:
+    """
+    Args:
+        env_: an instance of type gym.Env, StockEnvTrade
+        seed: seed for the environment
+        use_normalization: if normalize the environment.
+
+    Returns:
+        thunk: a function that returns the environment with gym wrappers
+    """
     def thunk():
         if use_normalization:
             #env = gym.make(gym_id)
@@ -319,20 +307,18 @@ class Agent(nn.Module):
         Returns:
         - The scalar (float) value of that state, as estimated by the net
         """
-        #assert isinstance(self.envs.single_action_space, spaces.Box) == True     
-        #print("self.actor_mean(x)", self.actor_mean(x).shape) [1,8]
+
         action_mean = self.actor_mean(x)
-        #action_mean = torch.reshape(self.actor_mean(x), (1,-1))
-        #print("action_mean shape", action_mean.shape) [1,8]
         action_logstd = self.actor_logstd.expand_as(action_mean)
         action_std = torch.exp(action_logstd)
         probs = Normal(action_mean, action_std) #Creates a normal distribution parameterized by action_mean and action_std
 
         if action is None:
             action = probs.sample()
-            # Actions could be on arbitrary scale, so clip the actions to avoid
-            # out of bound error (e.g. if sampling from a Gaussian distribution)
-        
+
+        # Actions could be on arbitrary scale, so clip the actions to avoid
+        # out of bound error (e.g. if sampling from a Gaussian distribution)
+        # this is dealt with the environment wrapper ClipAction
         #clip action, see https://ai.stackexchange.com/questions/28572/how-to-define-a-continuous-action-distribution-with-a-specific-range-for-reinfor
         #action = np.clip(action, self.envs.single_action_space.low, self.envs.single_action_space.high)
         #assert torch.all((action >= -1) & (action <= 1)), "Not all elements are in the interval [-1, 1]"

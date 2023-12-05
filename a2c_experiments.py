@@ -8,7 +8,7 @@ import tqdm
 import os
 from collections import defaultdict
 
-from src.models.a2c.a2c import Agent, A2CAgent
+from src.models.a2c.a2c_old import Agent, A2CAgent
 from src.env.environment import StockEnvTrade
 from src.utils.common_utils import (dict_to_namedtuple, 
                                     replace_dict, 
@@ -50,7 +50,7 @@ def main():
     result = defaultdict(dict)
 
     df_train = pd.read_csv("data/yahoo_finance_train.csv")
-    df_test = pd.read_csv("data/yahoo_finance_test.csv")
+    df_test = pd.read_csv("data/yahoo_finance_val.csv")
 
     for i, params_dict in tqdm.tqdm(enumerate(PARAM_SETS)):
         config = replace_dict(config_dict, params_dict)
