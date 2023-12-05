@@ -8,7 +8,7 @@ import tqdm
 import os
 from collections import defaultdict
 
-from src.models.a2c.a2c_old import Agent, A2CAgent
+from src.models.a2c import Agent, A2CAgent
 from src.env.environment import StockEnvTrade
 from src.utils.common_utils import (dict_to_namedtuple, 
                                     replace_dict, 
@@ -33,7 +33,6 @@ param_grid = {
     'total_timesteps': [25000, 50000, 75000],
     'num_steps': [256, 1024],
     'gae': [True, False],
-    'norm_adv': [True, False],
     "normalize_env": [True, False],
     "anneal_lr": [True, False],
 }

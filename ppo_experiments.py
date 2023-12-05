@@ -1,4 +1,5 @@
-# run nohup python3 ppo_experiments.py >/dev/null 2>&1
+# scripts for running experiments
+# e.g. nohup python3 ppo_experiments.py >/dev/null 2>&1
 import json
 import gymnasium as gym
 import numpy as np
@@ -8,13 +9,16 @@ import tqdm
 import os
 from collections import defaultdict
 
-from src.models.ppo.ppo import Agent, PPOAgent
+from src.models.ppo import Agent, PPOAgent
 from src.env.environment import StockEnvTrade
 from src.utils.common_utils import (dict_to_namedtuple, 
                                     replace_dict, 
                                     DRL_prediction,
                                     make_env_test
                                     )
+
+
+CONFIG_PATH = "experiment_configs/ppo_config.json"
 
 # Define the hyperparameters to tune
 # param_grid = {
@@ -28,23 +32,28 @@ from src.utils.common_utils import (dict_to_namedtuple,
 #     "normalize_env": [True, False]
 # }
 
+# PARAM_GRID = {
+#     'learning_rate': [2.5e-5, 2.5e-4, 2.5e-3],
+#     'total_timesteps': [25000, 50000, 75000],
+#     'num_steps': [256, 1024],
+#     'gae': [True, False],
+#     'norm_adv': [True, False],
+#     "normalize_env": [True, False],
+#     "anneal_lr": [True, False],
+# }
+
 PARAM_GRID = {
-    'learning_rate': [2.5e-5, 2.5e-4, 2.5e-3],
-    'total_timesteps': [25000, 50000, 75000],
-    'num_steps': [256, 1024],
+    'learning_rate': [2.5e-3],
+    'total_timesteps': [100000, 150000],
+    'num_steps': [1024],
     'gae': [True, False],
     'norm_adv': [True, False],
-    "normalize_env": [True, False],
+    "normalize_env": [True],
     "anneal_lr": [True, False],
 }
 
 KEYS = PARAM_GRID.keys()
 PARAM_SETS = [dict(zip(KEYS, values)) for values in itertools.product(*PARAM_GRID.values())]
-
-N_RUNS = 5 #average performance over 5 runs
-CONFIG_PATH = "configs/ppo_config.json"
-TRAIN_DATA_PATH = "data/yahoo_finance_train.csv"
-TEST_DATA_PATH = "data/yahoo_finance_test.csv"
 
 def main():
     with open(CONFIG_PATH) as f:
@@ -52,15 +61,16 @@ def main():
 
     result = defaultdict(dict)
 
-    df_train = pd.read_csv(TRAIN_DATA_PATH)
-    df_test = pd.read_csv(TEST_DATA_PATH)
+    df_train = pd.read_csv(config_dict["init_params"]["train_data_path"])
+    df_test = pd.read_csv(config_dict["init_params"]["test_data_path"])
+    n_runs = config_dict["init_params"]["n_runs"] #run n times and average the score
 
     for i, params_dict in tqdm.tqdm(enumerate(PARAM_SETS)):
         config = replace_dict(config_dict, params_dict)
         config["init_params"]["exp_name"] = f"hyperparam_{i}"
         config_params = dict_to_namedtuple(config)
         
-        for j in range(N_RUNS): #run several times and average the score
+        for j in range(n_runs): 
             ppo_agent = PPOAgent(data = df_train, env = StockEnvTrade, agent_model = Agent,
                                 init_params = config_params.init_params, 
                                 algo_params = config_params.algo_params,
@@ -90,7 +100,7 @@ def main():
 
             cumulative_returns_daily_drl_ppo.to_csv(os.path.join(save_path, f"cum_return_summary_run{j}.csv"), index=False)
 
-    with open('models/ppo/experiment_all_result.json', 'w') as fp:
+    with open(os.path.join(config_params.init_params.save_path, "experiment_all_result.json"), 'w') as fp:
         json.dump(result, fp)
 
 if __name__ == "__main__":
