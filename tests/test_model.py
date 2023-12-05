@@ -1,14 +1,10 @@
 import pytest
-import pandas as pd
 import numpy as np
-import torch
 import math
 import gymnasium as gym
 
-from src.utils.common_utils import DRL_prediction, make_env_test
-from src.models.ppo.ppo import Agent, PPOAgent, make_env
+from src.utils.common_utils import DRL_prediction, Agent, make_env_test
 from src.env.environment import StockEnvTrade
-
 
 @pytest.fixture
 def input_env(input_stock_data):
@@ -24,14 +20,13 @@ def input_model(input_env):
     model = Agent(envs=input_env, 
                 input_dims=np.array(input_env.observation_space.shape).prod(),
                 output_dims=np.prod(input_env.action_space.shape))
-    #model.load_state_dict(torch.load("models/ppo/ppo_0_0/torch_ppo.pt"))
     return model
 
 
 #Post-train tests
 def test_drl_model(input_stock_data, input_env, input_model):
     """
-    test the generated portfolio weights
+    test the generated portfolio weights make sense
     """
 
     test_obs, _ = input_env.reset()

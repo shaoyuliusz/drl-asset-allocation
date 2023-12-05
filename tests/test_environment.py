@@ -1,9 +1,8 @@
-import pytest
 import gymnasium as gym
 import numpy as np
 import math
 
-from src.models.ppo.ppo import make_env
+from src.utils.common_utils import make_env
 
 SEED = 123
 NUM_STEPS = 100
@@ -46,7 +45,7 @@ def test_actions_memory(test_env: gym.Env) -> None:
     for time_step in range(NUM_STEPS):
         action = test_env.action_space.sample()
         obs, rew, terminated, truncated, info = test_env.step(action)
-    
+        
     actions_memory = test_env.save_action_memory()
     for act in actions_memory:
         assert len(act) == test_env.action_space.shape[0], "number of actions in actions memory must equal to action space size (8)"
