@@ -17,9 +17,9 @@ def input_env(input_stock_data):
 @pytest.fixture
 def input_model(input_env):
     #initialize the model
-    model = Agent(envs=input_env, 
-                input_dims=np.array(input_env.observation_space.shape).prod(),
-                output_dims=np.prod(input_env.action_space.shape))
+    model = Agent(input_dims=np.array(input_env.observation_space.shape).prod(),
+                  output_dims=np.prod(input_env.action_space.shape)
+                  )
     return model
 
 

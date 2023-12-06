@@ -116,7 +116,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class Agent(nn.Module):
-    def __init__(self, envs, input_dims, output_dims):
+    def __init__(self, input_dims, output_dims):
         """
         Initializes the agent with actor and value network.
         We only implement the continuous actor network. 
@@ -130,22 +130,21 @@ class Agent(nn.Module):
         """
         super(Agent, self).__init__()
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(input_dims, 64)), #np.array(envs.single_observation_space.shape).prod()
+            layer_init(nn.Linear(input_dims, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 1), std=1.0),
         )
         self.actor_mean = nn.Sequential(
-            layer_init(nn.Linear(input_dims, 64)), #np.array(envs.single_observation_space.shape).prod()
+            layer_init(nn.Linear(input_dims, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, output_dims), std=0.01), #np.prod(envs.single_action_space.shape)=8
+            layer_init(nn.Linear(64, output_dims), std=0.01),
         )
         #state independent standard deviations
-        self.actor_logstd = nn.Parameter(torch.zeros(1, output_dims)) #np.prod(envs.single_action_space.shape)
-        self.envs = envs
+        self.actor_logstd = nn.Parameter(torch.zeros(1, output_dims))
 
 
     def get_value(self, x):

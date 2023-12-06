@@ -78,7 +78,7 @@ class PPOAgent:
         input_dims = np.array(self.model_envs.single_observation_space.shape).prod()
         output_dims = np.prod(self.model_envs.single_action_space.shape)
         
-        self.agent = self.agent_model(self.model_envs, input_dims, output_dims).to(self.device)
+        self.agent = self.agent_model(input_dims, output_dims).to(self.device)
         self.optimizer = optim.Adam(self.agent.parameters(), lr=self.algo_params.learning_rate, eps=1e-5)
 
         # ALGO Logic: Storage setup
