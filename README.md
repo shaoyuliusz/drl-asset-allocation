@@ -8,8 +8,8 @@ In this project, we use deep reinforcement learning to address asset allocation 
 
 ## Project Structure
 1 - The main results in the paper are in the folder `notebooks`.
-    * `ablation-studies.ipynb` reports our ablation study results.
-    * `plot_best_models.ipynb` compares our reinforcement learning agents with baseline models in test data.
+* `ablation-studies.ipynb` reports our ablation study results.
+* `plot_best_models.ipynb` compares our reinforcement learning agents with baseline models in test data.
 
 2 - The default configuration files for training PPO and A2C agents are in `experiment_configs` folder. To perform grid search for model hyperparameters, please edit the PARAM_GRID variable in ppo_experiments.py, and make a new `experiment` folder to train new agents. For example,
 ```python
